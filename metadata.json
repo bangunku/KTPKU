@@ -1,0 +1,6 @@
+{
+  "name": "KTP Search & Data Management",
+  "description": "Aplikasi pencari, verifikasi, dan manajemen data KTP & Kartu Keluarga (KK) yang modular, responsif, dan mendukung perangkat mobile.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
