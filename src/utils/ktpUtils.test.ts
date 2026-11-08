@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   calculateAge,
+  checkDuplicates,
   computeStats,
   DEFAULT_HEADERS,
   filterRecords,
@@ -12,6 +13,7 @@ import {
   parseCSV,
   SAMPLE_CSV_DATA,
   serializeCSV,
+  validateNik,
 } from './ktpUtils';
 import { FilterState } from '../types/ktp';
 
@@ -148,3 +150,33 @@ test('computeStats calculates accurate family, voter, checked, and matched count
   assert.equal(stats.editedCount, 1);
   assert.equal(DEFAULT_HEADERS.length, 13);
 });
+
+test('validateNik checks 16-digit length, extracts birth date and gender', () => {
+  // Male (day 17)
+  const maleNik = validateNik('3273011708780001');
+  assert.equal(maleNik.isValid, true);
+  assert.equal(maleNik.genderEstimated, 'LAKI-LAKI');
+  assert.equal(maleNik.birthDateEstimated, '17-08-1978');
+
+  // Female (day 22 + 40 = 62)
+  const femaleNik = validateNik('3273016204810002');
+  assert.equal(femaleNik.isValid, true);
+  assert.equal(femaleNik.genderEstimated, 'PEREMPUAN');
+  assert.equal(femaleNik.birthDateEstimated, '22-04-1981');
+
+  // Invalid length
+  const invalidShort = validateNik('12345');
+  assert.equal(invalidShort.isValid, false);
+});
+
+test('checkDuplicates detects duplicate NIKs or names across records', () => {
+  const testData = [
+    DEFAULT_HEADERS,
+    ['1', 'KK1', '3273011708780001', 'BUDI', '', '', '', '', '', '', '', '', ''],
+    ['2', 'KK2', '3273011708780001', 'BUDI DUPLIKAT', '', '', '', '', '', '', '', '', ''],
+  ];
+  const { duplicateNiks } = checkDuplicates(testData);
+  assert.equal(duplicateNiks.has('3273011708780001'), true);
+  assert.equal(duplicateNiks.get('3273011708780001')?.length, 2);
+});
+

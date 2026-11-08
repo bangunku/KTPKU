@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Save, X } from 'lucide-react';
-import { calculateAge, DEFAULT_HEADERS, getZodiacInfo } from '../utils/ktpUtils';
+import {
+  calculateAge,
+  DEFAULT_HEADERS,
+  getZodiacInfo,
+  validateNik,
+} from '../utils/ktpUtils';
 
 interface EditRecordModalProps {
   isOpen: boolean;
@@ -77,6 +82,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
 
   const liveAge = calculateAge(formValues[6], formValues[7]);
   const liveZodiac = getZodiacInfo(formValues[6]);
+  const nikValidation = formValues[2] ? validateNik(formValues[2]) : null;
 
   return (
     <div
@@ -152,12 +158,31 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                       placeholder={
                         FIELD_PLACEHOLDERS[upperHeader] || `Masukkan ${header}...`
                       }
-                      className={`w-full min-h-[42px] px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-900 ${
+                      className={`w-full min-h-[42px] px-3 py-2 text-sm bg-slate-50 border rounded-lg text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-900 ${
+                        index === 2 && formValues[2]
+                          ? nikValidation?.isValid
+                            ? 'border-emerald-300'
+                            : 'border-amber-300'
+                          : 'border-slate-300'
+                      } ${
                         index === 1 || index === 2 || index === 0 || index === 7
                           ? 'font-mono tabular-nums'
                           : ''
                       }`}
                     />
+                    {index === 2 && formValues[2] && (
+                      <div className="mt-1 text-[11px]">
+                        {nikValidation?.isValid ? (
+                          <span className="text-emerald-700 flex items-center gap-1 font-medium">
+                            ✓ Format 16 digit valid · Kelamin dari NIK: {nikValidation.genderEstimated} · Estimasi tgl: {nikValidation.birthDateEstimated}
+                          </span>
+                        ) : (
+                          <span className="text-amber-700">
+                            ⚠ {nikValidation?.message}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     {index === 6 && (liveAge !== null || liveZodiac) && (
                       <div className="mt-1 text-[11px] text-slate-600 flex flex-wrap items-center gap-1.5">
                         {liveAge !== null && (

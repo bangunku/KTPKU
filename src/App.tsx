@@ -10,6 +10,7 @@ import {
   ViewedRecordsMap,
 } from './types/ktp';
 import {
+  checkDuplicates,
   computeStats,
   DEFAULT_HEADERS,
   filterRecords,
@@ -193,6 +194,11 @@ export default function App() {
   const stats = useMemo(
     () => computeStats(csvData, viewedRecords, matchingStatus, editedRecords),
     [csvData, viewedRecords, matchingStatus, editedRecords]
+  );
+
+  const duplicateCheck = useMemo(
+    () => checkDuplicates(csvData),
+    [csvData]
   );
 
   const totalPages = Math.max(
@@ -598,7 +604,19 @@ export default function App() {
           stats={stats}
           filteredCount={filteredRows.length}
           filters={filters}
+          duplicateCount={duplicateCheck.duplicateNiks.size}
           onApplyQuickFilter={handleUpdateFilters}
+          onFilterDuplicates={() => {
+            const firstDupNik = Array.from(duplicateCheck.duplicateNiks.keys())[0];
+            if (firstDupNik) {
+              handleUpdateFilters({ searchTerm: firstDupNik });
+              addToast(
+                'Menyaring NIK duplikat',
+                `Menampilkan entri dengan NIK ${firstDupNik}`,
+                'info'
+              );
+            }
+          }}
         />
 
         {/* Filter & Storage Toolbar */}

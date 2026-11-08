@@ -6,17 +6,44 @@ interface StatsStripProps {
   stats: KtpStatsSummary;
   filteredCount: number;
   filters: FilterState;
+  duplicateCount?: number;
   onApplyQuickFilter: (patch: Partial<FilterState>) => void;
+  onFilterDuplicates?: () => void;
 }
 
 export const StatsStrip: React.FC<StatsStripProps> = ({
   stats,
   filteredCount,
   filters,
+  duplicateCount = 0,
   onApplyQuickFilter,
+  onFilterDuplicates,
 }) => {
   return (
-    <section aria-label="Ringkasan Statistik Data KTP" className="mb-6">
+    <section aria-label="Ringkasan Statistik Data KTP" className="mb-6 space-y-2.5">
+      {duplicateCount > 0 && (
+        <div
+          role="status"
+          className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl px-4 py-2.5 flex items-center justify-between text-xs"
+        >
+          <div className="flex items-center gap-2">
+            <span className="font-bold">⚠ Terdeteksi {duplicateCount} NIK Duplikat</span>
+            <span className="text-amber-700 hidden sm:inline">
+              Ada entri dengan NIK sama dalam data yang mungkin perlu diperiksa.
+            </span>
+          </div>
+          {onFilterDuplicates && (
+            <button
+              type="button"
+              onClick={onFilterDuplicates}
+              className="px-2.5 py-1 bg-amber-200 hover:bg-amber-300 rounded-md font-semibold text-amber-950 transition-colors cursor-pointer"
+            >
+              Lihat Duplikat
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="bg-white border border-slate-200 rounded-xl grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 overflow-hidden">
         {/* Metric 1: Total Records */}
         <button

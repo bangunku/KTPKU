@@ -653,3 +653,114 @@ export function computeStats(
     editedCount,
   };
 }
+
+export interface NikValidationResult {
+  isValid: boolean;
+  message: string;
+  provinceCode?: string;
+  regencyCode?: string;
+  districtCode?: string;
+  birthDateEstimated?: string;
+  genderEstimated?: 'LAKI-LAKI' | 'PEREMPUAN';
+}
+
+/**
+ * Validates 16-digit Indonesian NIK structure and extracts encoded demographic data.
+ * Format: [PP][KK][CC][DDMMYY][NNNN]
+ * If female, day has +40 added to day.
+ */
+export function validateNik(nikStr?: string): NikValidationResult {
+  if (!nikStr || !nikStr.trim()) {
+    return { isValid: false, message: 'NIK tidak boleh kosong.' };
+  }
+  const clean = nikStr.trim();
+  if (!/^\d{16}$/.test(clean)) {
+    return {
+      isValid: false,
+      message: `NIK harus tepat 16 digit angka (saat ini ${clean.length} karakter).`,
+    };
+  }
+
+  const prov = clean.slice(0, 2);
+  const kab = clean.slice(2, 4);
+  const kec = clean.slice(4, 6);
+  let day = parseInt(clean.slice(6, 8), 10);
+  const month = parseInt(clean.slice(8, 10), 10);
+  const yearShort = parseInt(clean.slice(10, 12), 10);
+
+  let gender: 'LAKI-LAKI' | 'PEREMPUAN' = 'LAKI-LAKI';
+  if (day > 40) {
+    gender = 'PEREMPUAN';
+    day -= 40;
+  }
+
+  if (month < 1 || month > 12 || day < 1 || day > 31) {
+    return {
+      isValid: false,
+      message: 'Format tanggal lahir dalam 6 digit tengah NIK tidak valid.',
+    };
+  }
+
+  const currentYearShort = new Date().getFullYear() % 100;
+  const fullYear = yearShort > currentYearShort ? 1900 + yearShort : 2000 + yearShort;
+  const birthDateEstimated = `${String(day).padStart(2, '0')}-${String(month).padStart(2, '0')}-${fullYear}`;
+
+  return {
+    isValid: true,
+    message: 'Struktur NIK 16 digit valid.',
+    provinceCode: prov,
+    regencyCode: kab,
+    districtCode: kec,
+    birthDateEstimated,
+    genderEstimated: gender,
+  };
+}
+
+export interface DuplicateCheckResult {
+  duplicateNiks: Map<string, number[]>; // NIK -> list of row indices
+  duplicateNames: Map<string, number[]>; // Name -> list of row indices
+}
+
+/**
+ * Detects duplicate NIK or Name entries in CSV data.
+ */
+export function checkDuplicates(csvData: string[][]): DuplicateCheckResult {
+  const nikMap = new Map<string, number[]>();
+  const nameMap = new Map<string, number[]>();
+
+  for (let i = 1; i < csvData.length; i++) {
+    const row = csvData[i];
+    if (!row) continue;
+    const nik = (row[2] || '').trim();
+    const name = (row[3] || '').trim().toUpperCase();
+
+    if (nik && nik !== '-') {
+      const list = nikMap.get(nik) || [];
+      list.push(i);
+      nikMap.set(nik, list);
+    }
+
+    if (name && name !== '-') {
+      const list = nameMap.get(name) || [];
+      list.push(i);
+      nameMap.set(name, list);
+    }
+  }
+
+  const duplicateNiks = new Map<string, number[]>();
+  for (const [nik, indices] of nikMap.entries()) {
+    if (indices.length > 1) {
+      duplicateNiks.set(nik, indices);
+    }
+  }
+
+  const duplicateNames = new Map<string, number[]>();
+  for (const [name, indices] of nameMap.entries()) {
+    if (indices.length > 1) {
+      duplicateNames.set(name, indices);
+    }
+  }
+
+  return { duplicateNiks, duplicateNames };
+}
+
