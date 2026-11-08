@@ -17,3 +17,27 @@
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
+
+@media print {
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* Hide app navigation and headers when printing */
+  header, nav, footer, .print\:hidden {
+    display: none !important;
+  }
+
+  /* Make modal containers full page width and height for printing */
+  div[role="dialog"] {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+  }
+
+  #printableArea {
+    padding: 0 !important;
+    width: 100% !important;
+  }
+}

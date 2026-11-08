@@ -13,6 +13,7 @@ import {
 import { IndexedCsvRow, MatchingStatusMap } from '../types/ktp';
 import {
   calculateAge,
+  getWetonInfo,
   getZodiacInfo,
   groupFamilyHierarchy,
   isEligibleVoter,
@@ -29,6 +30,7 @@ interface FamilyGraphViewProps {
   onToggleMatchingStatus: (nik: string) => void;
   onAddFamilyMember?: (kkNumber: string) => void;
   onCopyToClipboard: (text: string, label: string) => void;
+  onOpenPersonDetail?: (originalIndex: number) => void;
   compact?: boolean;
 }
 
@@ -42,6 +44,7 @@ export const FamilyGraphView: React.FC<FamilyGraphViewProps> = ({
   onToggleMatchingStatus,
   onAddFamilyMember,
   onCopyToClipboard,
+  onOpenPersonDetail,
   compact = false,
 }) => {
   const hierarchy = groupFamilyHierarchy(kkNumber, familyMembers);
@@ -70,6 +73,7 @@ export const FamilyGraphView: React.FC<FamilyGraphViewProps> = ({
     const age = calculateAge(ttl, umurData);
     const eligible = isEligibleVoter(age);
     const zodiac = getZodiacInfo(ttl);
+    const weton = getWetonInfo(ttl);
     const matchVal = matchingStatus[nik] || 'tidak-sesuai';
 
     const isKepala = hubungan.toUpperCase().includes('KEPALA');
@@ -106,11 +110,27 @@ export const FamilyGraphView: React.FC<FamilyGraphViewProps> = ({
           </div>
 
           {/* Full Name */}
-          <h4 className="mt-1 text-sm font-bold text-slate-900 leading-snug">
-            {nama}
-          </h4>
+          {onOpenPersonDetail ? (
+            <button
+              type="button"
+              onClick={() => onOpenPersonDetail(originalIndex)}
+              className="mt-1 text-sm font-bold text-slate-900 hover:text-blue-700 text-left leading-snug cursor-pointer group/name flex items-center gap-1.5"
+              title={`Klik untuk melihat detail lengkap biodata ${nama}`}
+            >
+              <span className="group-hover/name:underline decoration-blue-500 underline-offset-2">
+                {nama}
+              </span>
+              <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                Detail
+              </span>
+            </button>
+          ) : (
+            <h4 className="mt-1 text-sm font-bold text-slate-900 leading-snug">
+              {nama}
+            </h4>
+          )}
 
-          {/* Gender, Age & Zodiac Line (Unboxed clean metadata) */}
+          {/* Gender, Age, Zodiac & Weton Line */}
           <div className="mt-1 text-xs text-slate-600 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
             <span>{gender}</span>
             <span aria-hidden="true">·</span>
@@ -126,7 +146,17 @@ export const FamilyGraphView: React.FC<FamilyGraphViewProps> = ({
                 >
                   <span aria-hidden="true">{zodiac.symbol}</span>
                   <span>{zodiac.name}</span>
-                  <span className="text-slate-400 font-normal">({zodiac.element})</span>
+                </span>
+              </>
+            )}
+            {weton && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span
+                  className="font-semibold text-amber-900 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200/70 text-[10.5px]"
+                  title={`Weton Jawa: ${weton.wetonText} (Neptu ${weton.neptuHari} + ${weton.neptuPasaran} = ${weton.neptuTotal})\nWatak: ${weton.watak}`}
+                >
+                  {weton.wetonText} ({weton.neptuTotal})
                 </span>
               </>
             )}
@@ -152,6 +182,18 @@ export const FamilyGraphView: React.FC<FamilyGraphViewProps> = ({
                 {ttl}
               </span>
             </div>
+
+            {weton && (
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-slate-500 shrink-0">Weton:</span>
+                <span
+                  className="text-amber-900 font-medium text-right text-[11px] truncate max-w-[175px]"
+                  title={`${weton.wetonText} · Neptu ${weton.neptuTotal} (${weton.neptuHari}+${weton.neptuPasaran}) · ${weton.watak}`}
+                >
+                  {weton.wetonText} (Neptu {weton.neptuTotal})
+                </span>
+              </div>
+            )}
 
             <div className="flex items-baseline justify-between gap-2">
               <span className="text-slate-500 shrink-0">Pekerjaan:</span>

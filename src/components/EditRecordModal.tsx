@@ -3,6 +3,7 @@ import { Save, X } from 'lucide-react';
 import {
   calculateAge,
   DEFAULT_HEADERS,
+  getWetonInfo,
   getZodiacInfo,
   validateNik,
 } from '../utils/ktpUtils';
@@ -82,6 +83,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
 
   const liveAge = calculateAge(formValues[6], formValues[7]);
   const liveZodiac = getZodiacInfo(formValues[6]);
+  const liveWeton = getWetonInfo(formValues[6]);
   const nikValidation = formValues[2] ? validateNik(formValues[2]) : null;
 
   return (
@@ -183,21 +185,38 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                         )}
                       </div>
                     )}
-                    {index === 6 && (liveAge !== null || liveZodiac) && (
-                      <div className="mt-1 text-[11px] text-slate-600 flex flex-wrap items-center gap-1.5">
-                        {liveAge !== null && (
-                          <span className="font-mono font-semibold text-slate-800 tabular-nums">
-                            Umur: {liveAge} thn
-                          </span>
-                        )}
-                        {liveAge !== null && liveZodiac && (
-                          <span aria-hidden="true">·</span>
-                        )}
-                        {liveZodiac && (
-                          <span className="font-semibold text-amber-800">
-                            Zodiak: {liveZodiac.symbol} {liveZodiac.name} (Elemen{' '}
-                            {liveZodiac.element})
-                          </span>
+                    {index === 6 && (liveAge !== null || liveZodiac || liveWeton) && (
+                      <div className="mt-1.5 p-2 rounded-lg bg-slate-50 border border-slate-200 text-xs space-y-1">
+                        <div className="text-slate-600 flex flex-wrap items-center gap-1.5">
+                          {liveAge !== null && (
+                            <span className="font-mono font-semibold text-slate-800 tabular-nums">
+                              Umur: {liveAge} thn ({liveAge >= 17 ? 'Bisa Memilih' : 'Belum Memilih'})
+                            </span>
+                          )}
+                          {liveAge !== null && liveZodiac && (
+                            <span aria-hidden="true">·</span>
+                          )}
+                          {liveZodiac && (
+                            <span className="font-semibold text-amber-800">
+                              Zodiak: {liveZodiac.symbol} {liveZodiac.name} ({liveZodiac.element})
+                            </span>
+                          )}
+                        </div>
+                        {liveWeton && (
+                          <div className="pt-1 border-t border-slate-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px]">
+                            <span className="font-semibold text-amber-900 inline-flex items-center gap-1">
+                              <span>Weton Jawa:</span>
+                              <span className="bg-amber-100/70 px-1.5 py-0.5 rounded text-amber-950 font-bold">
+                                {liveWeton.wetonText}
+                              </span>
+                              <span className="text-slate-500 font-normal">
+                                (Neptu {liveWeton.neptuHari} + {liveWeton.neptuPasaran} = {liveWeton.neptuTotal})
+                              </span>
+                            </span>
+                            <span className="text-slate-600 italic">
+                              {liveWeton.watak}
+                            </span>
+                          </div>
                         )}
                       </div>
                     )}

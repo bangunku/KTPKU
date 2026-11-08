@@ -6,6 +6,7 @@ import {
   FilePlus2,
   GitFork,
   Pencil,
+  User,
   XCircle,
 } from 'lucide-react';
 import {
@@ -16,6 +17,7 @@ import {
 } from '../types/ktp';
 import {
   calculateAge,
+  getWetonInfo,
   getZodiacInfo,
   isEligibleVoter,
   maskNumber,
@@ -36,6 +38,7 @@ interface DataTableProps {
   onToggleMatchingStatus: (nik: string) => void;
   onOpenFamilyModal: (kkNumber: string) => void;
   onOpenEditModal: (originalIndex: number) => void;
+  onOpenPersonDetail: (originalIndex: number) => void;
   onAddFamilyMember: (kkNumber: string) => void;
   onCopyToClipboard: (text: string, label: string) => void;
   onAddNewRecord: () => void;
@@ -56,6 +59,7 @@ export const DataTable: React.FC<DataTableProps> = ({
   onToggleMatchingStatus,
   onOpenFamilyModal,
   onOpenEditModal,
+  onOpenPersonDetail,
   onAddFamilyMember,
   onCopyToClipboard,
   onAddNewRecord,
@@ -124,6 +128,7 @@ export const DataTable: React.FC<DataTableProps> = ({
             onToggleMatchingStatus={onToggleMatchingStatus}
             onAddFamilyMember={onAddFamilyMember}
             onCopyToClipboard={onCopyToClipboard}
+            onOpenPersonDetail={onOpenPersonDetail}
           />
         ))}
       </div>
@@ -154,16 +159,16 @@ export const DataTable: React.FC<DataTableProps> = ({
           <table id="dataTable" className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-semibold text-slate-600">
-                <th className="py-3 px-2.5 w-10 text-right">No</th>
-                <th className="py-3 px-2.5">No. KK</th>
-                <th className="py-3 px-2.5">NIK</th>
-                <th className="py-3 px-2.5">Nama Lengkap</th>
-                <th className="py-3 px-2.5">Alamat</th>
-                <th className="py-3 px-2.5">Umur, Pemilih & Zodiak</th>
-                <th className="py-3 px-2.5">Status Edit</th>
-                <th className="py-3 px-2 text-center">Checklist</th>
-                <th className="py-3 px-2.5">Matching</th>
-                <th className="py-3 px-2.5 text-right">Aksi</th>
+                <th className="py-3 px-2.5 w-10 text-right shrink-0">No</th>
+                <th className="py-3 px-2.5 min-w-[145px] shrink-0">No. KK</th>
+                <th className="py-3 px-2.5 min-w-[145px] shrink-0">NIK</th>
+                <th className="py-3 px-2.5 min-w-[170px]">Nama Lengkap</th>
+                <th className="py-3 px-2.5 min-w-[200px]">Alamat</th>
+                <th className="py-3 px-2.5 min-w-[185px]">Umur, Zodiak & Weton</th>
+                <th className="py-3 px-2.5 min-w-[110px]">Status Edit</th>
+                <th className="py-3 px-2 text-center min-w-[70px]">Checklist</th>
+                <th className="py-3 px-2.5 min-w-[110px]">Matching</th>
+                <th className="py-3 px-2.5 text-right min-w-[130px]">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 text-xs sm:text-sm">
@@ -181,6 +186,7 @@ export const DataTable: React.FC<DataTableProps> = ({
                 const age = calculateAge(ttl, fallbackAge);
                 const eligible = isEligibleVoter(age);
                 const zodiac = getZodiacInfo(ttl);
+                const weton = getWetonInfo(ttl);
                 const isChecked = Boolean(viewedRecords[nik]);
                 const matchVal = matchingStatus[nik] || 'tidak-sesuai';
                 const editInfo = editedRecords[nik] || { status: 'Not Edited' };
@@ -228,11 +234,19 @@ export const DataTable: React.FC<DataTableProps> = ({
                       </button>
                     </td>
 
-                    {/* NAMA & Subtitle Metadata */}
+                    {/* NAMA & Subtitle Metadata (Clickable to view detail modal) */}
                     <td className="py-3 px-2.5">
-                      <div className="font-semibold text-slate-900 leading-snug">
-                        {nama}
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onOpenPersonDetail(originalIndex)}
+                        title={`Klik untuk melihat detail lengkap & biodata KTP ${nama}`}
+                        className="text-left font-bold text-slate-900 hover:text-blue-700 underline decoration-slate-300 hover:decoration-blue-600 transition-colors cursor-pointer group inline-flex flex-wrap items-center gap-1.5 leading-snug break-words"
+                      >
+                        <span className="break-words">{nama}</span>
+                        <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200/70 group-hover:bg-blue-100 transition-colors shrink-0">
+                          Detail
+                        </span>
+                      </button>
                       <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-1 gap-y-0.5 mt-0.5">
                         {gender && (
                           <span className="whitespace-nowrap">{gender}</span>
@@ -244,21 +258,21 @@ export const DataTable: React.FC<DataTableProps> = ({
                       </div>
                     </td>
 
-                    {/* ALAMAT */}
-                    <td className="py-3 px-2.5 max-w-[190px]">
+                    {/* ALAMAT (Tidak terpotong paksa, dengan tombol salin & klik) */}
+                    <td className="py-3 px-2.5 min-w-[200px] max-w-[280px]">
                       <button
                         type="button"
                         onClick={() => onCopyToClipboard(alamat, 'Alamat')}
-                        title="Klik untuk menyalin Alamat"
-                        className="text-left text-xs text-slate-700 hover:text-slate-900 line-clamp-2 cursor-pointer"
+                        title="Klik untuk menyalin Alamat lengkap"
+                        className="text-left text-xs text-slate-700 hover:text-slate-950 hover:underline decoration-slate-300 cursor-pointer block leading-relaxed break-words"
                       >
                         {alamat}
                       </button>
                     </td>
 
-                    {/* VOTER STATUS, AGE & ZODIAC (Unboxed clean metadata) */}
+                    {/* VOTER STATUS, AGE, ZODIAC & WETON JAWA */}
                     <td className="py-3 px-2.5 whitespace-nowrap">
-                      <div className="text-xs font-semibold">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold">
                         {eligible ? (
                           <span className="text-emerald-700">Bisa Memilih</span>
                         ) : (
@@ -266,21 +280,32 @@ export const DataTable: React.FC<DataTableProps> = ({
                             Tidak Bisa Memilih
                           </span>
                         )}
-                      </div>
-                      <div className="text-[11px] text-slate-600 flex items-center gap-1.5 mt-0.5">
-                        <span className="font-mono tabular-nums">
+                        <span className="text-slate-300 font-normal">·</span>
+                        <span className="font-mono tabular-nums text-slate-700">
                           {age !== null ? `${age} thn` : 'Umur -'}
                         </span>
+                      </div>
+                      <div className="text-[11px] text-slate-600 flex flex-wrap items-center gap-1.5 mt-1">
                         {zodiac && (
-                          <>
-                            <span aria-hidden="true">·</span>
-                            <span
-                              className="font-semibold text-amber-800"
-                              title={`Zodiak ${zodiac.name} (${zodiac.dateRange}) · Elemen ${zodiac.element}`}
-                            >
-                              {zodiac.symbol} {zodiac.name}
-                            </span>
-                          </>
+                          <span
+                            className="font-medium text-amber-800"
+                            title={`Zodiak ${zodiac.name} (${zodiac.dateRange}) · Elemen ${zodiac.element}`}
+                          >
+                            {zodiac.symbol} {zodiac.name}
+                          </span>
+                        )}
+                        {zodiac && weton && (
+                          <span className="text-slate-300 font-normal" aria-hidden="true">
+                            ·
+                          </span>
+                        )}
+                        {weton && (
+                          <span
+                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-semibold bg-amber-50 text-amber-900 border border-amber-200/80 cursor-help"
+                            title={`Weton Jawa: ${weton.wetonText} (Neptu ${weton.neptuHari} + ${weton.neptuPasaran} = ${weton.neptuTotal})\nWatak: ${weton.watak}`}
+                          >
+                            {weton.wetonText} ({weton.neptuTotal})
+                          </span>
                         )}
                       </div>
                     </td>
@@ -393,11 +418,13 @@ export const DataTable: React.FC<DataTableProps> = ({
           const alamat = row[5] || '-';
           const ttl = row[6] || '';
           const fallbackAge = row[7] || '';
+          const shdk = row[10] || '';
           const pekerjaan = row[12] || '';
 
           const age = calculateAge(ttl, fallbackAge);
           const eligible = isEligibleVoter(age);
           const zodiac = getZodiacInfo(ttl);
+          const weton = getWetonInfo(ttl);
           const isChecked = Boolean(viewedRecords[nik]);
           const matchVal = matchingStatus[nik] || 'tidak-sesuai';
           const editInfo = editedRecords[nik] || { status: 'Not Edited' };
@@ -411,7 +438,7 @@ export const DataTable: React.FC<DataTableProps> = ({
                   : 'border-slate-200'
               }`}
             >
-              {/* Card Header: Number, Voter Status, Age, Zodiac, Name, and Checklist */}
+              {/* Card Header: Number, Voter Status, Age, Zodiac, Weton, Name, and Checklist */}
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-slate-500 font-mono tabular-nums">
@@ -440,14 +467,38 @@ export const DataTable: React.FC<DataTableProps> = ({
                         </span>
                       </>
                     )}
+                    {weton && (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <span className="font-sans font-semibold text-amber-900 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200/70 text-[11px]">
+                          {weton.wetonText} ({weton.neptuTotal})
+                        </span>
+                      </>
+                    )}
                   </div>
-                  <h3 className="mt-1 text-base font-bold text-slate-900 truncate">
-                    {nama}
-                  </h3>
+                  <div className="mt-1">
+                    <button
+                      type="button"
+                      onClick={() => onOpenPersonDetail(originalIndex)}
+                      title={`Klik untuk melihat detail lengkap & biodata ${nama}`}
+                      className="text-left text-base font-bold text-slate-900 hover:text-blue-700 transition-colors break-words cursor-pointer flex items-baseline justify-between gap-2 w-full group"
+                    >
+                      <span className="break-words">{nama}</span>
+                      <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 group-hover:bg-blue-100 px-2 py-0.5 rounded-md border border-blue-200/80 shrink-0 transition-colors">
+                        Detail →
+                      </span>
+                    </button>
+                  </div>
                   <div className="mt-0.5 text-xs text-slate-500 flex flex-wrap items-center gap-1.5">
                     {gender && <span>{gender}</span>}
-                    {gender && pekerjaan && <span aria-hidden="true">·</span>}
-                    {pekerjaan && <span>{pekerjaan}</span>}
+                    {gender && shdk && <span aria-hidden="true">·</span>}
+                    {shdk && <span>{shdk}</span>}
+                    {pekerjaan && (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <span className="text-slate-600">{pekerjaan}</span>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -500,13 +551,28 @@ export const DataTable: React.FC<DataTableProps> = ({
                   </span>
                 </div>
 
+                {weton && (
+                  <div className="flex items-start justify-between gap-2 bg-amber-50/60 p-2 rounded-lg border border-amber-200/60">
+                    <span className="text-slate-600 font-medium">Weton Jawa:</span>
+                    <div className="text-right">
+                      <span className="font-semibold text-amber-950">
+                        {weton.wetonText} (Neptu {weton.neptuTotal})
+                      </span>
+                      <div className="text-[11px] text-amber-800 mt-0.5">
+                        {weton.watak}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="pt-1">
                   <button
                     type="button"
                     onClick={() => onCopyToClipboard(alamat, 'Alamat')}
-                    className="text-left text-slate-700 hover:text-slate-900 flex items-start justify-between gap-2 w-full cursor-pointer"
+                    title="Klik untuk menyalin Alamat lengkap"
+                    className="text-left text-slate-800 hover:text-slate-950 flex items-start justify-between gap-2 w-full cursor-pointer leading-relaxed break-words"
                   >
-                    <span className="line-clamp-2">{alamat}</span>
+                    <span className="break-words">{alamat}</span>
                     <Copy className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
                   </button>
                 </div>
@@ -528,47 +594,58 @@ export const DataTable: React.FC<DataTableProps> = ({
                 )}
               </div>
 
-              {/* Card Footer Actions: 44px minimum touch targets */}
-              <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-3 gap-2">
+              {/* Card Footer Actions: Full-width detail button + touch actions */}
+              <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col gap-2">
                 <button
                   type="button"
-                  onClick={() => onToggleMatchingStatus(nik)}
-                  className={`min-h-[44px] px-2.5 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                    matchVal === 'sesuai'
-                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                      : 'bg-slate-100 text-slate-700 border-slate-200'
-                  }`}
+                  onClick={() => onOpenPersonDetail(originalIndex)}
+                  className="w-full min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-bold text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
-                  {matchVal === 'sesuai' ? (
-                    <>
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span>Sesuai</span>
-                    </>
-                  ) : (
-                    <>
-                      <XCircle className="w-4 h-4 text-slate-500 shrink-0" />
-                      <span>Tidak Sesuai</span>
-                    </>
-                  )}
+                  <User className="w-4 h-4 text-slate-700 shrink-0" />
+                  <span>Lihat Detail Lengkap & Biodata KTP</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => onOpenFamilyModal(kk)}
-                  className="min-h-[44px] px-3 py-2 rounded-xl text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
-                >
-                  <GitFork className="w-4 h-4 shrink-0" />
-                  <span>Keluarga</span>
-                </button>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onToggleMatchingStatus(nik)}
+                    className={`min-h-[44px] px-2 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                      matchVal === 'sesuai'
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                        : 'bg-slate-100 text-slate-700 border-slate-200'
+                    }`}
+                  >
+                    {matchVal === 'sesuai' ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>Sesuai</span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="w-4 h-4 text-slate-500 shrink-0" />
+                        <span>Tidak Sesuai</span>
+                      </>
+                    )}
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => onOpenEditModal(originalIndex)}
-                  className="min-h-[44px] px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
-                >
-                  <Pencil className="w-4 h-4 shrink-0" />
-                  <span>Edit</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => onOpenFamilyModal(kk)}
+                    className="min-h-[44px] px-2 py-2 rounded-xl text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+                  >
+                    <GitFork className="w-4 h-4 shrink-0" />
+                    <span>Keluarga</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onOpenEditModal(originalIndex)}
+                    className="min-h-[44px] px-2 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+                  >
+                    <Pencil className="w-4 h-4 shrink-0" />
+                    <span>Edit</span>
+                  </button>
+                </div>
               </div>
             </article>
           );

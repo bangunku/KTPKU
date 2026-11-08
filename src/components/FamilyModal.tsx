@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   Copy,
   GitFork,
+  Heart,
   List,
   Pencil,
   Trash2,
@@ -18,6 +19,7 @@ import {
 } from '../types/ktp';
 import {
   calculateAge,
+  getWetonInfo,
   getZodiacInfo,
   isEligibleVoter,
   maskNumber,
@@ -38,6 +40,8 @@ interface FamilyModalProps {
   onToggleMatchingStatus: (nik: string) => void;
   onAddFamilyMember: (kkNumber: string) => void;
   onCopyToClipboard: (text: string, label: string) => void;
+  onOpenPersonDetail?: (originalIndex: number) => void;
+  onOpenPetungJodoh?: (person1Idx: number, person2Idx: number) => void;
 }
 
 export const FamilyModal: React.FC<FamilyModalProps> = ({
@@ -54,12 +58,21 @@ export const FamilyModal: React.FC<FamilyModalProps> = ({
   onToggleMatchingStatus,
   onAddFamilyMember,
   onCopyToClipboard,
+  onOpenPersonDetail,
+  onOpenPetungJodoh,
 }) => {
   const [activeTab, setActiveTab] = useState<'graph' | 'list'>(initialTab);
 
   if (!isOpen || !kkNumber) return null;
 
   const familyAddress = familyMembers[0]?.row[5] || '-';
+
+  const headMember = familyMembers.find(
+    (m) => (m.row[10] || '').trim().toUpperCase() === 'KEPALA KELUARGA'
+  );
+  const spouseMember = familyMembers.find(
+    (m) => (m.row[10] || '').trim().toUpperCase() === 'ISTRI'
+  );
 
   return (
     <div
@@ -84,6 +97,25 @@ export const FamilyModal: React.FC<FamilyModalProps> = ({
                 <span className="font-mono tabular-nums font-semibold text-slate-700">
                   {familyMembers.length} Anggota
                 </span>
+                {headMember && spouseMember && onOpenPetungJodoh && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onOpenPetungJodoh(
+                          headMember.originalIndex,
+                          spouseMember.originalIndex
+                        )
+                      }
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-full transition-colors cursor-pointer"
+                      title="Hitung kecocokan Petung Jodoh Weton Suami & Istri"
+                    >
+                      <Heart className="w-3 h-3 fill-rose-600 stroke-rose-600" />
+                      <span>Petung Pasangan</span>
+                    </button>
+                  </>
+                )}
               </div>
               <h2
                 id="family-modal-title"
@@ -168,6 +200,7 @@ export const FamilyModal: React.FC<FamilyModalProps> = ({
               onToggleMatchingStatus={onToggleMatchingStatus}
               onAddFamilyMember={onAddFamilyMember}
               onCopyToClipboard={onCopyToClipboard}
+              onOpenPersonDetail={onOpenPersonDetail}
             />
           ) : (
             <>
@@ -207,6 +240,7 @@ export const FamilyModal: React.FC<FamilyModalProps> = ({
                 const currentAge = calculateAge(ttl, umurData);
                 const eligible = isEligibleVoter(currentAge);
                 const zodiac = getZodiacInfo(ttl);
+                const weton = getWetonInfo(ttl);
                 const matchVal = matchingStatus[nik] || 'tidak-sesuai';
                 const editInfo = editedRecords[nik];
 
@@ -248,10 +282,34 @@ export const FamilyModal: React.FC<FamilyModalProps> = ({
                               </span>
                             </>
                           )}
+                          {weton && (
+                            <>
+                              <span aria-hidden="true">·</span>
+                              <span className="font-semibold text-amber-900 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200/70 text-[11px]">
+                                {weton.wetonText} ({weton.neptuTotal})
+                              </span>
+                            </>
+                          )}
                         </div>
-                        <h3 className="text-base font-bold text-slate-900 mt-0.5">
-                          {nama}
-                        </h3>
+                        {onOpenPersonDetail ? (
+                          <button
+                            type="button"
+                            onClick={() => onOpenPersonDetail(originalIndex)}
+                            className="mt-0.5 text-base font-bold text-slate-900 hover:text-blue-700 text-left cursor-pointer group flex items-center gap-1.5"
+                            title={`Klik untuk melihat detail lengkap & biodata ${nama}`}
+                          >
+                            <span className="group-hover:underline decoration-blue-500 underline-offset-2">
+                              {nama}
+                            </span>
+                            <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                              Detail
+                            </span>
+                          </button>
+                        ) : (
+                          <h3 className="text-base font-bold text-slate-900 mt-0.5">
+                            {nama}
+                          </h3>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-2">
@@ -327,6 +385,26 @@ export const FamilyModal: React.FC<FamilyModalProps> = ({
                             : '-'}
                         </span>
                       </div>
+
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-slate-500 w-32 shrink-0">Weton Jawa:</span>
+                        <span className="font-semibold text-amber-900">
+                          {weton
+                            ? `${weton.wetonText} · Neptu ${weton.neptuTotal} (${weton.neptuHari}+${weton.neptuPasaran})`
+                            : '-'}
+                        </span>
+                      </div>
+
+                      {weton && (
+                        <div className="sm:col-span-2 flex items-start gap-2 bg-amber-50/60 p-2 rounded-lg border border-amber-200/60">
+                          <span className="text-amber-900 font-medium w-32 shrink-0">
+                            Watak Weton:
+                          </span>
+                          <span className="text-amber-950 font-normal">
+                            {weton.watak}
+                          </span>
+                        </div>
+                      )}
 
                       <div className="flex items-baseline gap-2">
                         <span className="text-slate-500 w-32 shrink-0">

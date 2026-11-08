@@ -17,7 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { FilterState } from '../types/ktp';
-import { ZODIAC_LIST } from '../utils/ktpUtils';
+import { PASARAN_LIST, ZODIAC_LIST } from '../utils/ktpUtils';
 
 export type WorkspaceViewMode = 'auto' | 'table' | 'cards' | 'graph';
 
@@ -67,8 +67,10 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
     filters.checklistFilter !== 'all' ||
     filters.matchingFilter !== 'all' ||
     filters.voterFilter !== 'all' ||
+    filters.ageFilter !== 'all' ||
     filters.editFilter !== 'all' ||
-    filters.zodiacFilter !== 'all';
+    filters.zodiacFilter !== 'all' ||
+    filters.pasaranFilter !== 'all';
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -196,9 +198,9 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
       </div>
 
       {/* Middle Row: Search & Filter Inputs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7 gap-3">
         {/* Global Search Input */}
-        <div className="sm:col-span-2 lg:col-span-1 relative">
+        <div className="sm:col-span-2 md:col-span-1 lg:col-span-1 relative">
           <label htmlFor="searchInput" className="block text-xs font-medium text-slate-600 mb-1">
             Cari Nama / NIK / KK
           </label>
@@ -276,6 +278,30 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
           </select>
         </div>
 
+        {/* Pasaran Jawa (Weton) Filter */}
+        <div>
+          <label htmlFor="pasaranFilter" className="block text-xs font-medium text-slate-600 mb-1">
+            Pasaran Jawa
+          </label>
+          <select
+            id="pasaranFilter"
+            value={filters.pasaranFilter}
+            onChange={(e) =>
+              onUpdateFilters({
+                pasaranFilter: e.target.value as FilterState['pasaranFilter'],
+              })
+            }
+            className="w-full min-h-[42px] px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-900 cursor-pointer"
+          >
+            <option value="all">Semua Pasaran</option>
+            {PASARAN_LIST.map((p) => (
+              <option key={p} value={p}>
+                {p} (Neptu {p === 'Pahing' ? 9 : p === 'Kliwon' ? 8 : p === 'Pon' ? 7 : p === 'Legi' ? 5 : 4})
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* Checklist Filter */}
         <div>
           <label htmlFor="checklistFilter" className="block text-xs font-medium text-slate-600 mb-1">
@@ -333,9 +359,32 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
             }
             className="w-full min-h-[42px] px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-900 cursor-pointer"
           >
-            <option value="all">Semua Umur</option>
+            <option value="all">Semua Hak Pilih</option>
             <option value="eligible">Bisa Memilih (≥17 Thn)</option>
             <option value="non-eligible">Tidak Bisa Memilih (&lt;17 Thn)</option>
+          </select>
+        </div>
+
+        {/* Age Generation Category Filter */}
+        <div>
+          <label htmlFor="ageFilter" className="block text-xs font-medium text-slate-600 mb-1">
+            Kategori Usia
+          </label>
+          <select
+            id="ageFilter"
+            value={filters.ageFilter}
+            onChange={(e) =>
+              onUpdateFilters({
+                ageFilter: e.target.value as FilterState['ageFilter'],
+              })
+            }
+            className="w-full min-h-[42px] px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-900 cursor-pointer"
+          >
+            <option value="all">Semua Usia</option>
+            <option value="first-time">Pemilih Pemula (17–21 Thn)</option>
+            <option value="productive">Usia Produktif (22–59 Thn)</option>
+            <option value="elderly">Lansia (≥60 Thn)</option>
+            <option value="under17">Anak-anak (&lt;17 Thn)</option>
           </select>
         </div>
       </div>

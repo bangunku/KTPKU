@@ -12,6 +12,7 @@ import {
 import {
   checkDuplicates,
   computeStats,
+  auditDataQuality,
   DEFAULT_HEADERS,
   filterRecords,
   parseCSV,
@@ -26,6 +27,10 @@ import { Pagination } from './components/Pagination';
 import { FamilyModal } from './components/FamilyModal';
 import { EditRecordModal } from './components/EditRecordModal';
 import { ConfirmModal } from './components/ConfirmModal';
+import { PersonDetailModal } from './components/PersonDetailModal';
+import { PetungJodohModal } from './components/PetungJodohModal';
+import { DataQualityModal } from './components/DataQualityModal';
+import { PrintReportModal } from './components/PrintReportModal';
 
 const STORAGE_KEYS = {
   CSV_DATA: 'csvData',
@@ -40,8 +45,10 @@ const INITIAL_FILTERS: FilterState = {
   checklistFilter: 'all',
   matchingFilter: 'all',
   voterFilter: 'all',
+  ageFilter: 'all',
   editFilter: 'all',
   zodiacFilter: 'all',
+  pasaranFilter: 'all',
   itemsPerPage: 10,
 };
 
@@ -93,6 +100,7 @@ export default function App() {
 
   // Modals state
   const [activeKK, setActiveKK] = useState<string | null>(null);
+  const [selectedPersonIndex, setSelectedPersonIndex] = useState<number | null>(null);
   const [editModalState, setEditModalState] = useState<{
     isOpen: boolean;
     isNewRecord: boolean;
@@ -118,6 +126,12 @@ export default function App() {
     confirmLabel: 'Ya, Hapus',
     onConfirm: () => {},
   });
+
+  // Advanced features modals
+  const [isPetungJodohOpen, setIsPetungJodohOpen] = useState<boolean>(false);
+  const [petungPair, setPetungPair] = useState<{ idx1?: number; idx2?: number } | null>(null);
+  const [isDataQualityOpen, setIsDataQualityOpen] = useState<boolean>(false);
+  const [isPrintReportOpen, setIsPrintReportOpen] = useState<boolean>(false);
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
@@ -201,6 +215,11 @@ export default function App() {
     [csvData]
   );
 
+  const dataAudit = useMemo(
+    () => auditDataQuality(csvData),
+    [csvData]
+  );
+
   const totalPages = Math.max(
     1,
     Math.ceil(filteredRows.length / filters.itemsPerPage)
@@ -231,7 +250,39 @@ export default function App() {
     return members;
   }, [activeKK, csvData]);
 
+  // Active person for PersonDetailModal
+  const selectedPersonDetail = useMemo<IndexedCsvRow | null>(() => {
+    if (
+      selectedPersonIndex === null ||
+      selectedPersonIndex < 1 ||
+      selectedPersonIndex >= csvData.length
+    ) {
+      return null;
+    }
+    const row = csvData[selectedPersonIndex];
+    if (!row) return null;
+    return {
+      originalIndex: selectedPersonIndex,
+      row,
+    };
+  }, [selectedPersonIndex, csvData]);
+
   // Handlers
+  const handleOpenPersonDetail = (originalIndex: number) => {
+    if (originalIndex < 1 || !csvData[originalIndex]) return;
+    setSelectedPersonIndex(originalIndex);
+  };
+
+  const handleOpenPetungJodoh = (idx1?: number, idx2?: number) => {
+    setPetungPair(idx1 && idx2 ? { idx1, idx2 } : null);
+    setIsPetungJodohOpen(true);
+  };
+
+  const handleFilterAnomalyNik = (nik: string) => {
+    handleUpdateFilters({ searchTerm: nik });
+    addToast('Menyaring NIK Anomali', `Menampilkan data warga dengan NIK ${nik}`, 'info');
+  };
+
   const handleUpdateFilters = (patch: Partial<FilterState>) => {
     setFilters((prev) => ({ ...prev, ...patch }));
     setCurrentPage(1);
@@ -583,6 +634,10 @@ export default function App() {
         filters={filters}
         onQuickNav={handleQuickNav}
         onAddNewRecord={handleAddNewRecord}
+        onOpenPetungJodoh={() => handleOpenPetungJodoh()}
+        onOpenDataQuality={() => setIsDataQualityOpen(true)}
+        onOpenPrintReport={() => setIsPrintReportOpen(true)}
+        anomalyCount={dataAudit.anomalies.length}
       />
 
       {/* Main Content Container */}
@@ -656,6 +711,7 @@ export default function App() {
           onCopyToClipboard={handleCopyToClipboard}
           onAddNewRecord={handleAddNewRecord}
           onLoadSampleData={handleLoadSampleData}
+          onOpenPersonDetail={handleOpenPersonDetail}
           hasAnyData={stats.totalRecords > 0}
         />
 
@@ -678,6 +734,28 @@ export default function App() {
         </div>
       </footer>
 
+      {/* Person Full Detail & Biodata Modal */}
+      <PersonDetailModal
+        isOpen={Boolean(selectedPersonDetail)}
+        selectedPerson={selectedPersonDetail}
+        matchingStatus={matchingStatus}
+        viewedRecords={viewedRecords}
+        editedRecords={editedRecords}
+        maskSensitive={maskSensitive}
+        onClose={() => setSelectedPersonIndex(null)}
+        onEditRecord={(originalIndex) => {
+          setSelectedPersonIndex(null);
+          handleOpenEditModal(originalIndex);
+        }}
+        onOpenFamilyModal={(kkNumber) => {
+          setSelectedPersonIndex(null);
+          handleOpenFamilyModal(kkNumber);
+        }}
+        onToggleMatchingStatus={handleToggleMatchingStatus}
+        onToggleChecklist={handleToggleChecklist}
+        onCopyToClipboard={handleCopyToClipboard}
+      />
+
       {/* Family View Modal */}
       <FamilyModal
         isOpen={Boolean(activeKK)}
@@ -692,6 +770,37 @@ export default function App() {
         onToggleMatchingStatus={handleToggleMatchingStatus}
         onAddFamilyMember={handleAddFamilyMember}
         onCopyToClipboard={handleCopyToClipboard}
+        onOpenPersonDetail={handleOpenPersonDetail}
+        onOpenPetungJodoh={handleOpenPetungJodoh}
+      />
+
+      {/* Petung Jodoh Weton Jawa Modal */}
+      <PetungJodohModal
+        isOpen={isPetungJodohOpen}
+        onClose={() => {
+          setIsPetungJodohOpen(false);
+          setPetungPair(null);
+        }}
+        csvData={csvData}
+        initialPerson1Index={petungPair?.idx1}
+        initialPerson2Index={petungPair?.idx2}
+      />
+
+      {/* Data Quality & Anomaly Inspector Modal */}
+      <DataQualityModal
+        isOpen={isDataQualityOpen}
+        onClose={() => setIsDataQualityOpen(false)}
+        csvData={csvData}
+        onFilterAnomalyNik={handleFilterAnomalyNik}
+        onEditRecord={handleOpenEditModal}
+      />
+
+      {/* Print Field Verification Report Modal */}
+      <PrintReportModal
+        isOpen={isPrintReportOpen}
+        onClose={() => setIsPrintReportOpen(false)}
+        filteredRows={filteredRows}
+        totalRecords={stats.totalRecords}
       />
 
       {/* Add / Edit Record Modal */}

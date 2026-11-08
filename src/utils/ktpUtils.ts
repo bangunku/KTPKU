@@ -1,9 +1,15 @@
 import {
+  DataAnomalyItem,
+  DataAuditSummary,
   EditedRecordsMap,
   FilterState,
   IndexedCsvRow,
   MatchingStatusMap,
+  Pasaran,
+  PetungCategory,
+  PetungJodohResult,
   ViewedRecordsMap,
+  WetonInfo,
   ZodiacInfo,
   ZodiacSign,
 } from '../types/ktp';
@@ -306,6 +312,90 @@ export function getZodiacInfo(birthDateString?: string): ZodiacInfo | null {
   return ZODIAC_LIST.find((z) => z.name === signName) || null;
 }
 
+export const PASARAN_LIST: Pasaran[] = ['Legi', 'Pahing', 'Pon', 'Wage', 'Kliwon'];
+
+export const HARI_NEPTU: Record<string, number> = {
+  Minggu: 5,
+  Senin: 4,
+  Selasa: 3,
+  Rabu: 7,
+  Kamis: 8,
+  Jumat: 6,
+  Sabtu: 9,
+};
+
+export const PASARAN_NEPTU: Record<Pasaran, number> = {
+  Legi: 5,
+  Pahing: 9,
+  Pon: 7,
+  Wage: 4,
+  Kliwon: 8,
+};
+
+export const HARI_NAMES = [
+  'Minggu',
+  'Senin',
+  'Selasa',
+  'Rabu',
+  'Kamis',
+  'Jumat',
+  'Sabtu',
+];
+
+export const NEPTU_WATAK: Record<number, string> = {
+  7: 'Lakuning Pandhita — Pendiam, setia, tekun, dan berjiwa luhur',
+  8: 'Lakuning Geni — Pemberani, berjiwa pemimpin, cepat tanggap dan bersemangat',
+  9: 'Lakuning Angin — Lincah, mudah bergaul, pandai memikat, dan mandiri',
+  10: 'Lakuning Pendhita Sakti — Cerdas, gemar menolong, setia kawan, dan tekun',
+  11: 'Lakuning Bintang — Tutur kata halus, dermawan, ramah, dan disayangi banyak orang',
+  12: 'Lakuning Kembang — Cinta damai, penyejuk suasana, disenangi teman, dan berbudi luhur',
+  13: 'Lakuning Lintang — Karismatik, mandiri, berwibawa tinggi, dan senang berpetualang',
+  14: 'Lakuning Rembulan — Pengayom, pendengar yang baik, tutur kata santun, dan bijaksana',
+  15: 'Lakuning Srengenge — Berwibawa tinggi, berenergi besar, tegas, dan menjadi panutan',
+  16: 'Lakuning Bumi — Berjiwa pengayom, lapang dada, tabah, dan murah hati',
+  17: 'Lakuning Gunung — Berprinsip kokoh, pantang menyerah, mandiri, dan dapat dipercaya',
+  18: 'Lakuning Paripurna — Pemimpin sejati, berwibawa agung, bijaksana, dan dermawan',
+};
+
+/**
+ * Calculates Javanese Weton (Hari, Pasaran, Neptu, Watak) based on birth date.
+ * Anchor reference: 1970-01-01 was Thursday (Kamis) and Pasaran Wage.
+ */
+export function getWetonInfo(birthDateString?: string): WetonInfo | null {
+  const parts = parseBirthDateParts(birthDateString);
+  if (!parts) return null;
+
+  const { day, month, year } = parts;
+  // Calculate UTC epoch days to avoid local timezone offset skews
+  const utcMs = Date.UTC(year, month - 1, day);
+  const epochDays = Math.floor(utcMs / 86400000);
+
+  // UTC Day of week: 0 = Sunday (Minggu), 1 = Monday (Senin), ..., 6 = Saturday (Sabtu)
+  const dayOfWeekIndex = new Date(utcMs).getUTCDay();
+  const hari = HARI_NAMES[dayOfWeekIndex] || 'Minggu';
+
+  // 1970-01-01 (epoch 0) was Wage (index 3 in ['Legi', 'Pahing', 'Pon', 'Wage', 'Kliwon'])
+  // Handle negative epoch modulo correctly for dates before 1970
+  const pasaranIndex = ((((epochDays % 5) + 5) % 5) + 3) % 5;
+  const pasaran = PASARAN_LIST[pasaranIndex];
+
+  const neptuHari = HARI_NEPTU[hari] ?? 5;
+  const neptuPasaran = PASARAN_NEPTU[pasaran] ?? 5;
+  const neptuTotal = neptuHari + neptuPasaran;
+  const wetonText = `${hari} ${pasaran}`;
+  const watak = NEPTU_WATAK[neptuTotal] || 'Berbudi pekerti luhur dan bersahaja';
+
+  return {
+    hari,
+    pasaran,
+    neptuHari,
+    neptuPasaran,
+    neptuTotal,
+    wetonText,
+    watak,
+  };
+}
+
 /**
  * Calculates age from Indonesian KTP "TEMPAT, DD-MM-YYYY" string, or direct date strings.
  * Falls back to numeric fallbackAge if birthDateString cannot be parsed.
@@ -519,6 +609,22 @@ export function filterRecords(
     if (filters.zodiacFilter && filters.zodiacFilter !== 'all') {
       const zodiac = getZodiacInfo(row[6]);
       if (!zodiac || zodiac.name !== filters.zodiacFilter) continue;
+    }
+
+    // 8. Pasaran Jawa filter
+    if (filters.pasaranFilter && filters.pasaranFilter !== 'all') {
+      const weton = getWetonInfo(row[6]);
+      if (!weton || weton.pasaran !== filters.pasaranFilter) continue;
+    }
+
+    // 9. Age generation category filter
+    if (filters.ageFilter && filters.ageFilter !== 'all') {
+      const age = calculateAge(row[6], row[7], referenceDate);
+      if (age === null) continue;
+      if (filters.ageFilter === 'under17' && age >= 17) continue;
+      if (filters.ageFilter === 'first-time' && (age < 17 || age > 21)) continue;
+      if (filters.ageFilter === 'productive' && (age < 22 || age > 59)) continue;
+      if (filters.ageFilter === 'elderly' && age < 60) continue;
     }
 
     results.push({ originalIndex: i, row });
@@ -762,5 +868,252 @@ export function checkDuplicates(csvData: string[][]): DuplicateCheckResult {
   }
 
   return { duplicateNiks, duplicateNames };
+}
+
+export const PETUNG_DEFINITIONS: Record<
+  number,
+  {
+    category: PetungCategory;
+    title: string;
+    status: 'Sangat Baik' | 'Baik' | 'Perlu Waspada' | 'Tantangan';
+    description: string;
+    nasehat: string;
+    persentaseKecocokan: number;
+  }
+> = {
+  1: {
+    category: 'PEGAT',
+    title: 'Pegat (Ujian & Cobaan)',
+    status: 'Tantangan',
+    description:
+      'Pasangan ini berpotensi sering menemui ujian dalam bidang ekonomi, komunikasi, atau perbedaan watak yang membutuhkan kedewasaan tinggi.',
+    nasehat:
+      'Utamakan saling mengalah, hindari egoisme, diskusikan rencana keuangan secara transparan, dan perbanyak doa serta sedekah.',
+    persentaseKecocokan: 62,
+  },
+  2: {
+    category: 'RATU',
+    title: 'Ratu (Dihormati & Berwibawa)',
+    status: 'Sangat Baik',
+    description:
+      'Pasangan sangat harmonis, memiliki wibawa tinggi, disegani tetangga serta keluarga besar, dan dianugerahi rezeki yang lancar.',
+    nasehat:
+      'Tetap rendah hati, jaga kerukunan dengan lingkungan sekitar, dan jangan lalai bersyukur.',
+    persentaseKecocokan: 95,
+  },
+  3: {
+    category: 'JODOH',
+    title: 'Jodoh (Serasi & Langgeng)',
+    status: 'Sangat Baik',
+    description:
+      'Pasangan serasi sejati. Mampu menerima kekurangan dan kelebihan masing-masing, rukun dan tentram hingga hari tua.',
+    nasehat:
+      'Pertahankan komunikasi yang mesra dan saling mendukung karir serta cita-cita pasangan.',
+    persentaseKecocokan: 98,
+  },
+  4: {
+    category: 'TOPO',
+    title: 'Topo (Prihatin di Awal, Sukses di Akhir)',
+    status: 'Baik',
+    description:
+      'Di awal pernikahan mungkin akan mengalami perjuangan atau fase prihatin, namun ketekunan akan berbuah kebahagiaan dan kemapanan.',
+    nasehat:
+      'Kunci sukses adalah kesabaran, kerja keras bersama, dan keyakinan bahwa masa depan cerah akan terwujud.',
+    persentaseKecocokan: 82,
+  },
+  5: {
+    category: 'TINARI',
+    title: 'Tinari (Murah Rezeki & Beruntung)',
+    status: 'Sangat Baik',
+    description:
+      'Pasangan dikaruniai kemudahan rezeki, sandang pangan berkecukupan, dan sering mendapatkan pertolongan yang tidak terduga.',
+    nasehat:
+      'Kelola rezeki dengan bijak untuk tabungan masa depan dan giat beramal membantu sanak keluarga yang membutuhkan.',
+    persentaseKecocokan: 93,
+  },
+  6: {
+    category: 'PADU',
+    title: 'Padu (Sering Berdebat Namun Tetap Utuh)',
+    status: 'Perlu Waspada',
+    description:
+      'Pasangan cenderung sering adu argumen atau berselisih faham dalam hal-hal kecil, namun jarang sampai pada taraf perpisahan jika saling mengalah.',
+    nasehat:
+      'Belajarlah menjadi pendengar yang sabar, hindari membesar-besarkan masalah sepele, dan jangan mengambil keputusan saat emosi.',
+    persentaseKecocokan: 70,
+  },
+  7: {
+    category: 'SUJANAN',
+    title: 'Sujanan (Waspada Godaan & Prasangka)',
+    status: 'Perlu Waspada',
+    description:
+      'Pasangan ini diuji dalam hal kepercayaan, kecemburuan, atau potensi godaan pihak luar yang menguji kesetiaan.',
+    nasehat:
+      'Tegakkan kejujuran dan keterbukaan tanpa rahasia, hindari prasangka buruk, serta perkuat komitmen rumah tangga.',
+    persentaseKecocokan: 66,
+  },
+  8: {
+    category: 'PESTHI',
+    title: 'Pesthi (Rukun, Damai & Sentosa)',
+    status: 'Sangat Baik',
+    description:
+      'Rumah tangga berjalan adem ayem, tenteram, damai tanpa gejolak berarti. Pasangan dapat membimbing anak cucu dalam keteduhan.',
+    nasehat:
+      'Jadikan rumah tangga sebagai tempat bernaung yang menyejukkan hati dan panutan bagi keluarga sekitar.',
+    persentaseKecocokan: 96,
+  },
+};
+
+/**
+ * Calculates Javanese Petung Jodoh compatibility between two people based on total Neptu modulo 8.
+ */
+export function calculatePetungJodoh(
+  weton1: WetonInfo,
+  weton2: WetonInfo,
+  name1: string = 'Pasangan 1',
+  name2: string = 'Pasangan 2'
+): PetungJodohResult {
+  const totalNeptu = weton1.neptuTotal + weton2.neptuTotal;
+  const rem = totalNeptu % 8;
+  const sisaBagi8 = rem === 0 ? 8 : rem;
+  const def = PETUNG_DEFINITIONS[sisaBagi8];
+
+  return {
+    person1Name: name1,
+    person1Weton: weton1,
+    person2Name: name2,
+    person2Weton: weton2,
+    totalNeptu,
+    sisaBagi8,
+    category: def.category,
+    title: def.title,
+    status: def.status,
+    description: def.description,
+    nasehat: def.nasehat,
+    persentaseKecocokan: def.persentaseKecocokan,
+  };
+}
+
+/**
+ * Audits CSV dataset quality, identifying NIK anomalies, format errors, mismatch between NIK & TTL,
+ * and demographic stats like first-time voters and elderly residents.
+ */
+export function auditDataQuality(csvData: string[][]): DataAuditSummary {
+  const anomalies: DataAnomalyItem[] = [];
+  let firstTimeVoterCount = 0;
+  let elderlyCount = 0;
+
+  if (!csvData || csvData.length <= 1) {
+    return {
+      totalRecords: 0,
+      cleanCount: 0,
+      healthScore: 100,
+      firstTimeVoterCount: 0,
+      elderlyCount: 0,
+      anomalies: [],
+    };
+  }
+
+  const dupResult = checkDuplicates(csvData);
+
+  // 1. Duplicate NIKs
+  for (const [nik, indices] of dupResult.duplicateNiks.entries()) {
+    for (const idx of indices) {
+      const row = csvData[idx];
+      if (row) {
+        anomalies.push({
+          id: `dup-${nik}-${idx}`,
+          originalIndex: idx,
+          row,
+          type: 'duplicate-nik',
+          severity: 'high',
+          title: 'NIK Duplikat Terdeteksi',
+          description: `NIK ${nik} digunakan oleh lebih dari 1 baris data warga.`,
+        });
+      }
+    }
+  }
+
+  // 2. Individual row audits
+  for (let i = 1; i < csvData.length; i++) {
+    const row = csvData[i];
+    if (!row) continue;
+    const nik = (row[2] || '').trim();
+    const nama = (row[3] || '').trim();
+    const ttl = (row[6] || '').trim();
+    const fallbackAge = row[7];
+    const shdk = (row[10] || '').trim().toUpperCase();
+
+    const age = calculateAge(ttl, fallbackAge);
+    if (age !== null) {
+      if (age >= 17 && age <= 21) firstTimeVoterCount++;
+      if (age >= 60) elderlyCount++;
+    }
+
+    // Check NIK validity
+    const nikValidation = validateNik(nik);
+    if (!nikValidation.isValid) {
+      anomalies.push({
+        id: `invalid-nik-${i}`,
+        originalIndex: i,
+        row,
+        type: 'invalid-nik',
+        severity: 'high',
+        title: 'Format NIK Tidak Valid',
+        description: nikValidation.message,
+      });
+    } else if (nikValidation.birthDateEstimated) {
+      // Check if NIK birth date matches TTL
+      const ttlParts = parseBirthDateParts(ttl);
+      if (ttlParts) {
+        const [nikD, nikM, nikY] = nikValidation.birthDateEstimated
+          .split('-')
+          .map(Number);
+        if (
+          nikD !== ttlParts.day ||
+          nikM !== ttlParts.month ||
+          nikY !== ttlParts.year
+        ) {
+          anomalies.push({
+            id: `mismatch-nik-${i}`,
+            originalIndex: i,
+            row,
+            type: 'nik-mismatch',
+            severity: 'medium',
+            title: 'Tanggal Lahir NIK vs Kolom TTL Berbeda',
+            description: `Tgl lahir di NIK (${nikValidation.birthDateEstimated}) berbeda dari kolom TEMPAT/TGL LAHIR (${ttl}).`,
+          });
+        }
+      }
+    }
+
+    // Check underage head of family
+    if (shdk === 'KEPALA KELUARGA' && age !== null && age < 17) {
+      anomalies.push({
+        id: `underage-head-${i}`,
+        originalIndex: i,
+        row,
+        type: 'underage-head',
+        severity: 'medium',
+        title: 'Kepala Keluarga di Bawah Umur (<17 Tahun)',
+        description: `${nama} tercatat sebagai Kepala Keluarga namun berumur ${age} tahun.`,
+      });
+    }
+  }
+
+  // Deduplicate anomaly count by originalIndex
+  const affectedIndices = new Set(anomalies.map((a) => a.originalIndex));
+  const totalRecords = csvData.length - 1;
+  const cleanCount = Math.max(0, totalRecords - affectedIndices.size);
+  const healthScore =
+    totalRecords > 0 ? Math.round((cleanCount / totalRecords) * 100) : 100;
+
+  return {
+    totalRecords,
+    cleanCount,
+    healthScore,
+    firstTimeVoterCount,
+    elderlyCount,
+    anomalies,
+  };
 }
 

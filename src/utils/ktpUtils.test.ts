@@ -1,12 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  auditDataQuality,
   calculateAge,
+  calculatePetungJodoh,
   checkDuplicates,
   computeStats,
   DEFAULT_HEADERS,
   filterRecords,
   getZodiacInfo,
+  getWetonInfo,
   groupFamilyHierarchy,
   isEligibleVoter,
   maskNumber,
@@ -76,8 +79,10 @@ test('filterRecords filters by searchTerm, address, checklist, matchingStatus, v
     checklistFilter: 'all',
     matchingFilter: 'all',
     voterFilter: 'all',
+    ageFilter: 'all',
     editFilter: 'all',
     zodiacFilter: 'all',
+    pasaranFilter: 'all',
     itemsPerPage: 10,
   };
 
@@ -118,6 +123,18 @@ test('filterRecords filters by searchTerm, address, checklist, matchingStatus, v
   );
   assert.equal(leos.length, 1);
   assert.equal(leos[0].row[3], 'BUDI SANTOSO');
+
+  // Filter by Pasaran Wage (Budi Santoso: 17-08-1978 is Kamis Wage)
+  const wageRecords = filterRecords(
+    SAMPLE_CSV_DATA,
+    { ...baseFilters, pasaranFilter: 'Wage' },
+    {},
+    {},
+    {},
+    refDate
+  );
+  assert.ok(wageRecords.length > 0);
+  assert.ok(wageRecords.some((r) => r.row[3] === 'BUDI SANTOSO'));
 });
 
 test('groupFamilyHierarchy separates heads/spouses and children cleanly', () => {
@@ -179,4 +196,82 @@ test('checkDuplicates detects duplicate NIKs or names across records', () => {
   assert.equal(duplicateNiks.has('3273011708780001'), true);
   assert.equal(duplicateNiks.get('3273011708780001')?.length, 2);
 });
+
+test('getWetonInfo accurately calculates Javanese Day, Pasaran, Neptu, and Watak', () => {
+  // 1. Proklamasi 17 Agustus 1945 was Jumat Legi
+  const proklamasi = getWetonInfo('JAKARTA, 17-08-1945');
+  assert.ok(proklamasi);
+  assert.equal(proklamasi.hari, 'Jumat');
+  assert.equal(proklamasi.pasaran, 'Legi');
+  assert.equal(proklamasi.neptuHari, 6);
+  assert.equal(proklamasi.neptuPasaran, 5);
+  assert.equal(proklamasi.neptuTotal, 11);
+  assert.equal(proklamasi.wetonText, 'Jumat Legi');
+  assert.ok(proklamasi.watak.includes('Lakuning Bintang'));
+
+  // 2. Budi Santoso: 17 Agustus 1978 was Kamis Wage
+  const budi = getWetonInfo('BANDUNG, 17-08-1978');
+  assert.ok(budi);
+  assert.equal(budi.hari, 'Kamis');
+  assert.equal(budi.pasaran, 'Wage');
+  assert.equal(budi.neptuHari, 8);
+  assert.equal(budi.neptuPasaran, 4);
+  assert.equal(budi.neptuTotal, 12);
+  assert.equal(budi.wetonText, 'Kamis Wage');
+  assert.ok(budi.watak.includes('Lakuning Kembang'));
+
+  // 3. Siti Rahmawati: 22 April 1981 was Rabu Pon
+  const siti = getWetonInfo('BANDUNG, 22-04-1981');
+  assert.ok(siti);
+  assert.equal(siti.hari, 'Rabu');
+  assert.equal(siti.pasaran, 'Pon');
+  assert.equal(siti.neptuHari, 7);
+  assert.equal(siti.neptuPasaran, 7);
+  assert.equal(siti.neptuTotal, 14);
+  assert.equal(siti.wetonText, 'Rabu Pon');
+  assert.ok(siti.watak.includes('Lakuning Rembulan'));
+
+  // 4. Invalid birth date returns null
+  assert.equal(getWetonInfo('INVALID_DATE'), null);
+  assert.equal(getWetonInfo(''), null);
+});
+
+test('calculatePetungJodoh accurately calculates compatibility between husband and wife', () => {
+  const budiWeton = getWetonInfo('BANDUNG, 17-08-1978'); // Kamis Wage: 12
+  const sitiWeton = getWetonInfo('BANDUNG, 22-04-1981'); // Rabu Pon: 14
+  assert.ok(budiWeton);
+  assert.ok(sitiWeton);
+
+  // Total Neptu = 12 + 14 = 26. 26 % 8 = 2 (RATU)
+  const result = calculatePetungJodoh(
+    budiWeton,
+    sitiWeton,
+    'BUDI SANTOSO',
+    'SITI RAHMAWATI'
+  );
+  assert.equal(result.totalNeptu, 26);
+  assert.equal(result.sisaBagi8, 2);
+  assert.equal(result.category, 'RATU');
+  assert.equal(result.status, 'Sangat Baik');
+  assert.equal(result.persentaseKecocokan, 95);
+  assert.ok(result.title.includes('Ratu'));
+});
+
+test('auditDataQuality audits dataset health and detects anomalies and demographic counts', () => {
+  const audit = auditDataQuality(SAMPLE_CSV_DATA);
+  assert.equal(audit.totalRecords, 12);
+  assert.ok(audit.healthScore >= 90);
+  assert.ok(audit.firstTimeVoterCount >= 1); // e.g. Rizky (22) or Fajar (18)
+  assert.equal(Array.isArray(audit.anomalies), true);
+
+  // When duplicate NIK is injected
+  const dirtyData = [
+    DEFAULT_HEADERS,
+    ['1', 'KK1', '3273011708780001', 'BUDI', '', '', 'BANDUNG, 17-08-1978', '48', '', '', '', '', ''],
+    ['2', 'KK2', '3273011708780001', 'BUDI 2', '', '', 'BANDUNG, 17-08-1978', '48', '', '', '', '', ''],
+  ];
+  const dirtyAudit = auditDataQuality(dirtyData);
+  assert.ok(dirtyAudit.anomalies.some((a) => a.type === 'duplicate-nik'));
+});
+
 
